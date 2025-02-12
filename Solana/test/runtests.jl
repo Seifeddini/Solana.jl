@@ -8,8 +8,6 @@ using Solana
 
 using Test
 
-ENV["RPC_URL"] = "http://localhost:8899"
-
 @testset "Basic Test" begin
     @info "----------- Start Basic_Test -----------"
 
@@ -17,17 +15,32 @@ ENV["RPC_URL"] = "http://localhost:8899"
     wallet1 = Solana.create_wallet("TestWallet1")
     wallet2 = Solana.create_wallet("TestWallet2")
 
-    @test wallet1 != Nothing
-    @test wallet2 != Nothing
+    @test wallet1 !== nothing
+    @test wallet2 !== nothing
+    @test wallet1.pubkey !== wallet2.pubkey
 
-    @info "Wallets created succsessfully"
+    @info "Wallets created successfully"
 
     # TEST airdrop_sol
-    Solana.airdrop_sol(wallet1.pubkey, 1_000_000_000)
-    Solana.airdrop_sol(wallet2.pubkey, 2_500_000_000)
-    # TEST get_balance
-    @test Solana.get_balance(wallet1.pubkey) == 1_000_000_000
-    @test Solana.get_balance(wallet2.pubkey) == 2_500_000_000
+    airdrop_amount1 = 1_000_000_000
+    airdrop_amount2 = 2_500_000_000
+    tr_w1 = Solana.airdrop_sol(wallet1.pubkey, airdrop_amount1)
+    tr_w2 = Solana.airdrop_sol(wallet2.pubkey, airdrop_amount2)
 
+    @test tr_w1 !== nothing
+    @test tr_w2 !== nothing
+
+    @info "Airdrop transactions completed"
+
+    sleep(15)  # Wait for transactions to be processed
+
+    # TEST get_balance
+    balance1 = Solana.get_balance(wallet1.pubkey)
+    balance2 = Solana.get_balance(wallet2.pubkey)
+
+    @test balance1 == airdrop_amount1
+    @test balance2 == airdrop_amount2
+
+    @info "Balances verified"
     @info "----------- Basic Test Passed -----------"
 end

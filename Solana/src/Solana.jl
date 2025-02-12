@@ -4,8 +4,6 @@ module Solana
 # using .SolanaTypes
 using JSON, Base64, Base58, HTTP, Logging
 
-const RPC_URL = ENV["RPC_URL"]
-
 # function get_block(slot=nothing)
 #     data = Dict(
 #         "jsonrpc" => "2.0",
@@ -25,7 +23,7 @@ const RPC_URL = ENV["RPC_URL"]
 #     try
 #         response = HTTP.request(
 #             "POST",
-#             RPC_URL,
+#             ENV["RPC_URL"],
 #             ["Content-Type" => "application/json"],
 #             body=JSON.json(data)
 #         )
@@ -54,7 +52,7 @@ const RPC_URL = ENV["RPC_URL"]
 
 #     response = HTTP.request(
 #         "POST",
-#         RPC_URL,
+#         ENV["RPC_URL"],
 #         ["Content-Type" => "application/json"],
 #         body=JSON.json(data)
 #     )
@@ -157,22 +155,33 @@ function create_wallet(name::String)::Wallet
 end
 
 function airdrop_sol(pubkey, amount::Int)
-
+    # TODO Track transactions
     payload = Dict(
         "jsonrpc" => "2.0",
         "id" => 1,
         "method" => "requestAirdrop",
-        "params" => [pubkey, string(amount)]
+        "params" => [pubkey, amount]
     )
 
-    response = HTTP.post(RPC_URL,
-        ["Content-Type" => "application/json"],
-        JSON.json(payload))
+    try
+        response = HTTP.post(ENV["RPC_URL"],
+            ["Content-Type" => "application/json"],
+            JSON.json(payload))
 
-    @info "Airdropped $amount lamports to $pubkey. Amount in SOL: " amount / 10^9
+        result = JSON.parse(String(response.body))
 
-    return JSON.parse(String(response.body))
+        if haskey(result, "error")
+            @error "Failed to airdrop SOL: $(result["error"]["message"])"
+            return nothing
+        end
 
+        @info "Airdropped $amount lamports to $pubkey. Amount in SOL: " amount / 10^9
+
+        return result["result"]
+    catch e
+        @error "Exception occurred: $e"
+        return nothing
+    end
 end
 
 function get_balance(pubkey)
@@ -184,15 +193,20 @@ function get_balance(pubkey)
         "params" => [pubkey]
     )
 
-    # Send the HTTP POST request to the local test validator
-    response = HTTP.post(RPC_URL, ["Content-Type" => "application/json"], JSON.json(payload))
+    try
+        # Send the HTTP POST request to the local test validator
+        response = HTTP.post(ENV["RPC_URL"], ["Content-Type" => "application/json"], JSON.json(payload))
 
-    # Parse and return the response
-    result = JSON.parse(String(response.body))
-    if haskey(result, "result") && haskey(result["result"], "value")
-        return result["result"]["value"]  # Balance in lamports
-    else
-        error("Failed to fetch balance: ", result)
+        # Parse and return the response
+        result = JSON.parse(String(response.body))
+
+        if haskey(result, "result") && haskey(result["result"], "value")
+            return result["result"]["value"]  # Balance in lamports
+        else
+            error("Failed to fetch balance: ", result)
+        end
+    catch e
+        error("Failed to fetch balance: $e")
     end
 end
 

@@ -6,6 +6,7 @@ version = "0.1.0"
 [deps]
 Base58 = "a832ea1e-0ca7-55ca-a41a-6462721bb861"
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
+Coverage = "a2441757-f6aa-5fb2-8edb-039e3f45d037"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
