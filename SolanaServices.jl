@@ -2,6 +2,7 @@ module SolanaServices
 
 include("SolanaTypes.jl")
 using .SolanaTypes
+using JSON, Base64, Base58
 
 function get_block(slot=nothing)
     data = Dict(
@@ -24,7 +25,7 @@ function get_block(slot=nothing)
             "POST",
             RPC_URL,
             ["Content-Type" => "application/json"],
-            body = JSON.json(data)
+            body=JSON.json(data)
         )
 
         body = JSON.parse(String(response.body))
@@ -53,7 +54,7 @@ function get_latest_slot()
         "POST",
         RPC_URL,
         ["Content-Type" => "application/json"],
-        body = JSON.json(data)
+        body=JSON.json(data)
     )
 
     body = JSON.parse(String(response.body))
@@ -62,12 +63,12 @@ end
 
 function create_token()
     output = read(`spl-token create-token`, String)
-    
+
     address = match(r"Address:\s+(\w+)", output).captures[1]
     program = match(r"under program\s+(\w+)", output).captures[1]
     decimals = parse(Int, match(r"Decimals:\s+(\d+)", output).captures[1])
     signature = match(r"Signature:\s+(\w+)", output).captures[1]
-    
+
     return Dict(
         "address" => address,
         "program" => program,
@@ -78,10 +79,10 @@ end
 
 function create_token_account(token_address)
     output = read(`spl-token create-account $token_address`, String)
-    
+
     account_address = match(r"Creating account\s+(\w+)", output).captures[1]
     signature = match(r"Signature:\s+(\w+)", output).captures[1]
-    
+
     return Dict(
         "account_address" => account_address,
         "signature" => signature
@@ -90,7 +91,7 @@ end
 
 function mint_token(token_address, amount)
     output = read(`spl-token mint $token_address $amount`, String)
-    return true;
+    return true
 end
 
 function check_token_balance(token_address)
@@ -98,16 +99,60 @@ function check_token_balance(token_address)
     return output
 end
 
+function base58_encode(data::Vector{UInt8})
+    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    num = BigInt(0)
+
+    # Convert byte array to BigInt
+    for byte in data
+        num = num * 256 + byte
+    end
+
+    # Encode to Base58
+    encoded = ""
+    while num > 0
+        num, remainder = divrem(num, 58)
+        encoded = alphabet[remainder+1] * encoded
+    end
+
+    # Add leading '1's for each leading zero byte in the input
+    for byte in data
+        if byte == 0
+            encoded = "1" * encoded
+        else
+            break
+        end
+    end
+
+    return encoded
+end
+
+function read_wallet_keys(filename::String)
+    # Read and parse the JSON file
+    json_data = JSON.parsefile(filename)
+
+    # Convert the integer array to bytes
+    byte_array = UInt8.(json_data)
+
+    # Extract private and public keys
+    private_key_bytes = byte_array[1:32]
+    public_key_bytes = byte_array[33:end]
+
+    public_key_string = base58_encode(public_key_bytes)
+    private_key_string = base58_encode(private_key_bytes)
+
+    return private_key_string, public_key_string
+end
+
+
 function create_wallet(name::String)::Wallet
     @info "Start Wallet Creation"
-    
     val = run(`solana-keygen new --force --no-bip39-passphrase --outfile  "~"/SolWallets/$name.json`)
-    println("VAL: $val")
     @info "New Wallet created"
 
-    public_key = read(`solana-keygen pubkey "~"/SolWallets/$name.json`, String)
-    public_key = chomp(public_key)
-    return public_key
+    private_key, public_key = read_wallet_keys("~/SolWallets/$name.json")
+
+    return Wallet(name, public_key, private_key)
 end
 
 function airdrop_sol(pubkey, amount::Int)
@@ -118,13 +163,13 @@ function airdrop_sol(pubkey, amount::Int)
         "method" => "requestAirdrop",
         "params" => [pubkey, string(amount)]
     )
-    
-    response = HTTP.post(RPC_URL, 
-                         ["Content-Type" => "application/json"],
-                         JSON.json(payload))
-                         
+
+    response = HTTP.post(RPC_URL,
+        ["Content-Type" => "application/json"],
+        JSON.json(payload))
+
     @info "Airdropped $amount lamports to $pubkey. Amount in SOL: " amount / 10^9
-    
+
     return JSON.parse(String(response.body))
 
 end
@@ -140,7 +185,7 @@ function get_balance(pubkey)
 
     # Send the HTTP POST request to the local test validator
     response = HTTP.post(RPC_URL, ["Content-Type" => "application/json"], JSON.json(payload))
-    
+
     # Parse and return the response
     result = JSON.parse(String(response.body))
     if haskey(result, "result") && haskey(result["result"], "value")
