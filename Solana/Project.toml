@@ -1,0 +1,17 @@
+name = "Solana"
+uuid = "591b7a94-2411-480f-8211-866434de88ce"
+authors = ["Siran Seifeddini <siran@seifeddini.com>"]
+version = "0.1.0"
+
+[deps]
+Base58 = "a832ea1e-0ca7-55ca-a41a-6462721bb861"
+Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
