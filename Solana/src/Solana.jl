@@ -61,33 +61,40 @@ using JSON, Base64, Base58, HTTP, Logging
 #     return body["result"]
 # end
 
-# function create_token()
-#     output = read(`spl-token create-token`, String)
+function create_token()
+    try
+        output = read(`spl-token create-token`, String)
 
-#     address = match(r"Address:\s+(\w+)", output).captures[1]
-#     program = match(r"under program\s+(\w+)", output).captures[1]
-#     decimals = parse(Int, match(r"Decimals:\s+(\d+)", output).captures[1])
-#     signature = match(r"Signature:\s+(\w+)", output).captures[1]
+        address = match(r"Address:\s+(\w+)", output).captures[1]
+        program = match(r"under program\s+(\w+)", output).captures[1]
+        decimals = parse(Int, match(r"Decimals:\s+(\d+)", output).captures[1])
+        signature = match(r"Signature:\s+(\w+)", output).captures[1]
 
-#     return Dict(
-#         "address" => address,
-#         "program" => program,
-#         "decimals" => decimals,
-#         "signature" => signature
-#     )
-# end
+        return Dict(
+            "address" => address,
+            "program" => program,
+            "decimals" => decimals,
+            "signature" => signature
+        )
+    catch e
+        @error "Exception occurred: $e"
+        return nothing
+    end
+end
 
-# function create_token_account(token_address)
-#     output = read(`spl-token create-account $token_address`, String)
+function create_token_account(token_address)
+    try
+        output = read(`spl-token create-account $token_address`, String)
 
-#     account_address = match(r"Creating account\s+(\w+)", output).captures[1]
-#     signature = match(r"Signature:\s+(\w+)", output).captures[1]
+        account_address = match(r"Creating account\s+(\w+)", output).captures[1]
+        signature = match(r"Signature:\s+(\w+)", output).captures[1]
 
-#     return Dict(
-#         "account_address" => account_address,
-#         "signature" => signature
-#     )
-# end
+        return TokenAccount(account_address, signature)
+    catch e
+        @error "Exception occurred: $e"
+        return nothing
+    end
+end
 
 # function mint_token(token_address, amount)
 #     output = read(`spl-token mint $token_address $amount`, String)
@@ -248,4 +255,17 @@ struct Wallet
     pubkey::String
     secretkey::String
 end
+
+struct TokenAccount
+    account_address::String
+    signature::String
+end
+
+struct Token
+    address::String
+    program::String
+    decimals::Int
+    signature::String
+end
+
 end

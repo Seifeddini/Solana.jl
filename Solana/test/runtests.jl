@@ -6,7 +6,7 @@ ENV["RPC_URL"] = "http://localhost:8899"
 # RUN: solana-test-validator --reset 
 using Solana
 
-using Test
+using Test, HTTP
 
 @testset "Basic Test" begin
     @info "----------- Start Basic_Test -----------"
@@ -43,4 +43,17 @@ using Test
 
     @info "Balances verified"
     @info "----------- Basic Test Passed -----------"
+end
+
+@testset "Token Test" begin
+    @info "----------- Start Token_Test -----------"
+    # Test creating Token_Test
+    token = Solana.create_token()
+
+    @test token !== nothing
+    # Test creating Token_Wallet
+    token_wallet = Solana.create_token_account(token["address"])
+
+    @test token_wallet !== nothing
+    # Test minting tokens
 end
