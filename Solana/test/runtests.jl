@@ -8,7 +8,7 @@ using Solana
 
 using Test, HTTP
 
-@testset "Basic Test" begin
+@testset failfast = true "Basic Test" begin
     @info "----------- Start Basic_Test -----------"
 
     # TEST create_wallet
@@ -47,7 +47,7 @@ using Test, HTTP
     @info "----------- Basic Test Passed -----------"
 end
 
-@testset "Token Test" begin
+@testset failfast = true "Token Test" begin
     @info "----------- Start Token_Test -----------"
     # Test creating Token_Test
     token::Token = Solana.create_token()
@@ -58,4 +58,17 @@ end
 
     @test token_wallet !== nothing
     # Test minting tokens
+
+    mint_amount::Int = 1_000_000_000
+    minted = Solana.mint_token(token.address, mint_amount)
+
+    @test minted !== nothing
+
+    #minted = wait(minted)
+
+    @test minted isa String
+
+    @test Solana.check_token_balance(token.address) == mint_amount
+
+    @info "----------- Token Test Passed -----------"
 end

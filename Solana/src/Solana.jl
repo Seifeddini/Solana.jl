@@ -79,7 +79,7 @@ function create_token()
     end
 end
 
-function create_token_account(token_address)
+function create_token_account(token_address)::TokenAccount
     try
         output = read(`spl-token create-account $token_address`, String)
 
@@ -93,37 +93,31 @@ function create_token_account(token_address)
     end
 end
 
-function get_signature_statuses(signatures::Vector{String})
-    payload = Dict(
-        "jsonrpc" => "2.0",
-        "id" => 1,
-        "method" => "getSignatureStatuses",
-        "params" => [signatures]
-    )
-
+function mint_token(token_address::String, amount::Int, target_state="confirmed", wait_time::Float64=30.0)
     try
-        response = HTTP.post(ENV["RPC_URL"],
-            ["Content-Type" => "application/json"],
-            JSON.json(payload))
+        output = read(`spl-token mint $token_address $amount`, String)
+        signature = String(match(r"Signature:\s+(\w+)", output).captures[1])
 
-        result = JSON.parse(String(response.body))
+        #confirmation = @async confirm_transaction(signature, target_state, wait_time)
 
-        return result["result"]
+        return signature
     catch e
-        @error "An error occured: $e"
-        return nothing
+        @error "Exception occurred: $e"
+        return false
     end
 end
 
-# function mint_token(token_address, amount)
-#     output = read(`spl-token mint $token_address $amount`, String)
-#     return true
-# end
-
-# function check_token_balance(token_address)
-#     output = read(`spl-token balance $token_address`, Int)
-#     return output
-# end
+function check_token_balance(token_address)
+    try
+        output = read(`spl-token balance $token_address`, String)
+        balance = parse(Int, match(r"\d+", output).match)
+        @debug "Output of check token balance: \n $balance \n \n ------"
+        return balance
+    catch e
+        @error "Exception occurred: $e"
+        return nothing
+    end
+end
 
 function base58_encode(data::Vector{UInt8})
     alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -171,14 +165,67 @@ function read_wallet_keys(filename::String)
 end
 
 function create_wallet(name::String)::Wallet
-    @info "Start Wallet Creation"
+    @debug "Start Wallet Creation"
     val = run(`solana-keygen new --force --no-bip39-passphrase --outfile  "~"/SolWallets/$name.json`)
-    @info "New Wallet created"
+    @debug "New Wallet created"
 
     private_key, public_key = read_wallet_keys("~/SolWallets/$name.json")
 
     return Wallet(name, public_key, private_key)
 end
+
+function get_signature_statuses(signatures::Vector{String})
+    payload = Dict(
+        "jsonrpc" => "2.0",
+        "id" => 1,
+        "method" => "getSignatureStatuses",
+        "params" => [signatures]
+    )
+
+    try
+        response = HTTP.post(ENV["RPC_URL"],
+            ["Content-Type" => "application/json"],
+            JSON.json(payload))
+
+        result = JSON.parse(String(response.body))
+
+        return result["result"]
+    catch e
+        @error "An error occured: $e"
+        return nothing
+    end
+end
+
+function confirm_transaction(signature::String, target_status="confirmed", limit::Float64=30.0)
+
+    if signature === nothing
+        return nothing
+    end
+
+    sleep_timer::Float64 = 1.0
+
+    status = get_signature_statuses([signature])
+    status = status["value"]
+
+    while !(typeof(status[1]) <: Dict) || (typeof(status[1]) <: Dict && status[1]["confirmationStatus"] != target_status)
+
+        # Timeout-condition
+        if sleep_timer > limit
+            @error "Airdrop transaction timed out"
+            return nothing
+        end
+
+        sleep(sleep_timer)
+        sleep_timer *= 1.5
+        status = get_signature_statuses([signature])
+        status = status["value"]
+
+        @debug "Waiting for confirmation... \n $status"
+    end
+
+    return signature
+end
+
 
 function airdrop_sol_async(pubkey, amount::Int, target_status="confirmed")
     # TODO Track transactions
@@ -201,37 +248,11 @@ function airdrop_sol_async(pubkey, amount::Int, target_status="confirmed")
             return nothing
         end
 
-        @info "Airdropped $amount lamports to $pubkey. Amount in SOL: " amount / 10^9
+        @debug "Airdropped $amount lamports to $pubkey. Amount in SOL: " amount / 10^9
 
         signature = result["result"]
 
-        if signature === nothing
-            return nothing
-        end
-
-        sleep_timer::Float32 = 1.0
-
-        status = get_signature_statuses([signature])
-        status = status["value"]
-
-        waiting_task = @async begin
-
-            while !(typeof(status[1]) <: Dict) || (typeof(status[1]) <: Dict && status[1]["confirmationStatus"] != target_status)
-
-                # Timeout-condition
-                if sleep_timer > 20.0
-                    @error "Airdrop transaction timed out"
-                    return nothing
-                end
-
-                sleep(sleep_timer)
-                sleep_timer *= 1.5
-                status = get_signature_statuses([signature])
-                status = status["value"]
-            end
-
-            return signature
-        end
+        waiting_task = @async confirm_transaction(signature, target_status)
 
         # Return Signature of the transaction
         return waiting_task
