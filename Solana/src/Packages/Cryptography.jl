@@ -1,3 +1,4 @@
+using Serialization
 
 function base58_encode(data::Vector{UInt8})::String
     alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -30,29 +31,26 @@ end
 struct CompactU16
     value::UInt16
 end
+export CompactU16
 
-function Base.show(io::IO, cu::CompactU16)
-    print(io, "CompactU16(", cu.value, ")")
-end
-
-function Base.serialize(s::AbstractSerializer, cu::CompactU16)
+function Base.write(io::IO, cu::CompactU16)
     rem_val = cu.value
     while true
         elem = UInt8(rem_val & 0x7f)
         rem_val >>= 7
         if rem_val == 0
-            write(s, elem)
+            write(io, elem)
             break
         else
-            write(s, elem | 0x80)
+            write(io, elem | 0x80)
         end
     end
 end
 
-function Base.deserialize(s::AbstractSerializer, ::Type{CompactU16})
+function Base.read(io::IO, ::Type{CompactU16})
     val = UInt16(0)
     for i in 0:2
-        elem = read(s, UInt8)
+        elem = read(io, UInt8)
         val |= UInt16(elem & 0x7f) << (i * 7)
         if (elem & 0x80) == 0
             return CompactU16(val)
@@ -63,42 +61,30 @@ end
 
 function encode_compact_u16(value::UInt16)
     io = IOBuffer()
-    serialize(io, CompactU16(value))
+    write(io, CompactU16(value))
     return take!(io)
 end
 
 function decode_compact_u16(bytes::Vector{UInt8})
     io = IOBuffer(bytes)
-    return deserialize(io, CompactU16).value
+    return read(io, CompactU16).value
 end
 
-function to_compact_array(arr::Array{T}) where {Task}
-    # Create an IOBuffer to write our compact array
+function to_compact_array(arr::Array{T}) where {T}
     io = IOBuffer()
-
-    # Encode and write the length of the array using CompactU16
-    serialize(io, CompactU16(UInt16(length(arr))))
-
-    # Serialize each element of the array
+    write(io, CompactU16(UInt16(length(arr))))
     for elem in arr
         serialize(io, elem)
     end
-
-    # Return the compact array as a Vector{UInt8}
     return take!(io)
 end
 
 function from_compact_array(bytes::Vector{UInt8}, ::Type{T}) where {T}
     io = IOBuffer(bytes)
-
-    # Deserialize the length
-    length = deserialize(io, CompactU16).value
-
-    # Deserialize each element
+    length = read(io, CompactU16).value
     result = Vector{T}(undef, length)
     for i in 1:length
-        result[i] = deserialize(io, T)
+        result[i] = deserialize(io)
     end
-
     return result
 end

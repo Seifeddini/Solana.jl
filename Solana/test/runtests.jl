@@ -6,7 +6,77 @@ ENV["RPC_URL"] = "http://localhost:8899"
 # RUN: solana-test-validator --reset 
 using Solana
 
-using Test, HTTP
+using Test, HTTP, Serialization
+
+@testset "CompactU16 and Compact Array Tests" begin
+    @testset "CompactU16 Encoding/Decoding" begin
+        test_values = [0, 127, 128, 255, 16383, 16384, 65535]
+        for value in test_values
+            compact = CompactU16(UInt16(value))
+            io = IOBuffer()
+            serialize(io, compact)
+            encoded = take!(io)
+
+            io = IOBuffer(encoded)
+            decoded = deserialize(io)
+
+            @test decoded.value == value
+        end
+    end
+
+    @testset "Compact Array - Integers" begin
+        int_arrays = [
+            Int[],
+            [1],
+            [1, 2, 3, 4, 5],
+            [0, 127, 128, 255, 16383, 16384, 65535]
+        ]
+        for arr in int_arrays
+            compact = Solana.to_compact_array(arr)
+            decoded = Solana.from_compact_array(compact, Int)
+            @test decoded == arr
+        end
+    end
+
+    @testset "Compact Array - Strings" begin
+        string_arrays = [
+            String[],
+            [""],
+            ["hello"],
+            ["hello", "world", "julia"],
+            ["a", "bb", "ccc", "dddd", "eeeee"]
+        ]
+        for arr in string_arrays
+            compact = Solana.to_compact_array(arr)
+            decoded = Solana.from_compact_array(compact, String)
+            @test decoded == arr
+        end
+    end
+
+    @testset "Compact Array - Custom Struct" begin
+        struct Point
+            x::Float64
+            y::Float64
+        end
+
+        point_arrays = [
+            Point[],
+            [Point(1.0, 2.0)],
+            [Point(1.0, 2.0), Point(3.0, 4.0), Point(5.0, 6.0)],
+            [Point(0.0, 0.0), Point(-1.5, 2.5), Point(3.14, -2.718)]
+        ]
+        for arr in point_arrays
+            compact = Solana.to_compact_array(arr)
+            decoded = Solana.from_compact_array(compact, Point)
+            @test decoded == arr
+        end
+    end
+
+    @testset "Error Handling" begin
+        @test_throws ErrorException Solana.from_compact_array([0xFF, 0xFF, 0xFF], Int)
+        @test_throws EOFError Solana.from_compact_array([0x01], Int)
+    end
+end
 
 @testset failfast = true "Basic Test" begin
     @info "----------- Start Basic_Test -----------"
@@ -72,3 +142,4 @@ end
 
     @info "----------- Token Test Passed -----------"
 end
+
