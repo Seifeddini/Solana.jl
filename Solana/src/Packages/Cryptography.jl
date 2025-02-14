@@ -26,3 +26,48 @@ function base58_encode(data::Vector{UInt8})::String
 
     return encoded
 end
+
+struct CompactU16
+    value::UInt16
+end
+
+function Base.show(io::IO, cu::CompactU16)
+    print(io, "CompactU16(", cu.value, ")")
+end
+
+function Base.serialize(s::AbstractSerializer, cu::CompactU16)
+    rem_val = cu.value
+    while true
+        elem = UInt8(rem_val & 0x7f)
+        rem_val >>= 7
+        if rem_val == 0
+            write(s, elem)
+            break
+        else
+            write(s, elem | 0x80)
+        end
+    end
+end
+
+function Base.deserialize(s::AbstractSerializer, ::Type{CompactU16})
+    val = UInt16(0)
+    for i in 0:2
+        elem = read(s, UInt8)
+        val |= UInt16(elem & 0x7f) << (i * 7)
+        if (elem & 0x80) == 0
+            return CompactU16(val)
+        end
+    end
+    throw(ErrorException("Invalid CompactU16 encoding"))
+end
+
+function encode_compact_u16(value::UInt16)
+    io = IOBuffer()
+    serialize(io, CompactU16(value))
+    return take!(io)
+end
+
+function decode_compact_u16(bytes::Vector{UInt8})
+    io = IOBuffer(bytes)
+    return deserialize(io, CompactU16).value
+end
