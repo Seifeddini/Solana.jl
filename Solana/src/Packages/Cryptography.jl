@@ -71,3 +71,34 @@ function decode_compact_u16(bytes::Vector{UInt8})
     io = IOBuffer(bytes)
     return deserialize(io, CompactU16).value
 end
+
+function to_compact_array(arr::Array{T}) where {Task}
+    # Create an IOBuffer to write our compact array
+    io = IOBuffer()
+
+    # Encode and write the length of the array using CompactU16
+    serialize(io, CompactU16(UInt16(length(arr))))
+
+    # Serialize each element of the array
+    for elem in arr
+        serialize(io, elem)
+    end
+
+    # Return the compact array as a Vector{UInt8}
+    return take!(io)
+end
+
+function from_compact_array(bytes::Vector{UInt8}, ::Type{T}) where {T}
+    io = IOBuffer(bytes)
+
+    # Deserialize the length
+    length = deserialize(io, CompactU16).value
+
+    # Deserialize each element
+    result = Vector{T}(undef, length)
+    for i in 1:length
+        result[i] = deserialize(io, T)
+    end
+
+    return result
+end
