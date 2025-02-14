@@ -4,6 +4,8 @@ module Solana
 # using .SolanaTypes
 using JSON, Base64, Base58, HTTP, Logging
 
+export AccountMeta, Instruction, MessageHeader, Message, Transaction, Wallet, TokenAccount, Token
+
 # function get_block(slot=nothing)
 #     data = Dict(
 #         "jsonrpc" => "2.0",
@@ -70,12 +72,7 @@ function create_token()
         decimals = parse(Int, match(r"Decimals:\s+(\d+)", output).captures[1])
         signature = match(r"Signature:\s+(\w+)", output).captures[1]
 
-        return Dict(
-            "address" => address,
-            "program" => program,
-            "decimals" => decimals,
-            "signature" => signature
-        )
+        return Token(address, program, decimals, signature)
     catch e
         @error "Exception occurred: $e"
         return nothing
@@ -92,6 +89,28 @@ function create_token_account(token_address)
         return TokenAccount(account_address, signature)
     catch e
         @error "Exception occurred: $e"
+        return nothing
+    end
+end
+
+function get_signature_statuses(signatures::Vector{String})
+    payload = Dict(
+        "jsonrpc" => "2.0",
+        "id" => 1,
+        "method" => "getSignatureStatuses",
+        "params" => [signatures]
+    )
+
+    try
+        response = HTTP.post(ENV["RPC_URL"],
+            ["Content-Type" => "application/json"],
+            JSON.json(payload))
+
+        result = JSON.parse(String(response.body))
+
+        return result["result"]
+    catch e
+        @error "An error occured: $e"
         return nothing
     end
 end
@@ -161,7 +180,7 @@ function create_wallet(name::String)::Wallet
     return Wallet(name, public_key, private_key)
 end
 
-function airdrop_sol(pubkey, amount::Int)
+function airdrop_sol_async(pubkey, amount::Int, target_status="confirmed")
     # TODO Track transactions
     payload = Dict(
         "jsonrpc" => "2.0",
@@ -184,20 +203,51 @@ function airdrop_sol(pubkey, amount::Int)
 
         @info "Airdropped $amount lamports to $pubkey. Amount in SOL: " amount / 10^9
 
-        return result["result"]
+        signature = result["result"]
+
+        if signature === nothing
+            return nothing
+        end
+
+        sleep_timer::Float32 = 1.0
+
+        status = get_signature_statuses([signature])
+        status = status["value"]
+
+        waiting_task = @async begin
+
+            while !(typeof(status[1]) <: Dict) || (typeof(status[1]) <: Dict && status[1]["confirmationStatus"] != target_status)
+
+                # Timeout-condition
+                if sleep_timer > 20.0
+                    @error "Airdrop transaction timed out"
+                    return nothing
+                end
+
+                sleep(sleep_timer)
+                sleep_timer *= 1.5
+                status = get_signature_statuses([signature])
+                status = status["value"]
+            end
+
+            return signature
+        end
+
+        # Return Signature of the transaction
+        return waiting_task
     catch e
         @error "Exception occurred: $e"
         return nothing
     end
 end
 
-function get_balance(pubkey)
+function get_balance(pubkey, status="confirmed")
     # Create the payload for the JSON RPC request
     payload = Dict(
         "jsonrpc" => "2.0",
         "id" => 1,
         "method" => "getBalance",
-        "params" => [pubkey]
+        "params" => [pubkey, Dict("commitment" => status)]
     )
 
     try
@@ -267,5 +317,4 @@ struct Token
     decimals::Int
     signature::String
 end
-
 end

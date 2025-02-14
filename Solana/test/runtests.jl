@@ -12,8 +12,8 @@ using Test, HTTP
     @info "----------- Start Basic_Test -----------"
 
     # TEST create_wallet
-    wallet1 = Solana.create_wallet("TestWallet1")
-    wallet2 = Solana.create_wallet("TestWallet2")
+    wallet1::Wallet = Solana.create_wallet("TestWallet1")
+    wallet2::Wallet = Solana.create_wallet("TestWallet2")
 
     @test wallet1 !== nothing
     @test wallet2 !== nothing
@@ -24,15 +24,16 @@ using Test, HTTP
     # TEST airdrop_sol
     airdrop_amount1 = 1_000_000_000
     airdrop_amount2 = 2_500_000_000
-    tr_w1 = Solana.airdrop_sol(wallet1.pubkey, airdrop_amount1)
-    tr_w2 = Solana.airdrop_sol(wallet2.pubkey, airdrop_amount2)
+    tr_w1 = Solana.airdrop_sol_async(wallet1.pubkey, airdrop_amount1, "finalized")
+    tr_w2 = Solana.airdrop_sol_async(wallet2.pubkey, airdrop_amount2, "finalized")
 
     @test tr_w1 !== nothing
     @test tr_w2 !== nothing
 
-    @info "Airdrop transactions completed"
+    tr_w1 = wait(tr_w1)
+    tr_w2 = wait(tr_w2)
 
-    sleep(15)  # Wait for transactions to be processed
+    @info "Airdrop transactions completed"
 
     # TEST get_balance
     balance1 = Solana.get_balance(wallet1.pubkey)
@@ -42,17 +43,18 @@ using Test, HTTP
     @test balance2 == airdrop_amount2
 
     @info "Balances verified"
+
     @info "----------- Basic Test Passed -----------"
 end
 
 @testset "Token Test" begin
     @info "----------- Start Token_Test -----------"
     # Test creating Token_Test
-    token = Solana.create_token()
+    token::Token = Solana.create_token()
 
-    @test token !== nothing
+    @test token isa Token
     # Test creating Token_Wallet
-    token_wallet = Solana.create_token_account(token["address"])
+    token_wallet = Solana.create_token_account(token.address)
 
     @test token_wallet !== nothing
     # Test minting tokens
