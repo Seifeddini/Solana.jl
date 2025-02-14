@@ -17,15 +17,15 @@ using Test, HTTP
 
     @test wallet1 !== nothing
     @test wallet2 !== nothing
-    @test wallet1.pubkey !== wallet2.pubkey
+    @test wallet1.account.Pubkey !== wallet2.account.Pubkey
 
     @info "Wallets created successfully"
 
     # TEST airdrop_sol
     airdrop_amount1 = 1_000_000_000
     airdrop_amount2 = 2_500_000_000
-    tr_w1 = Solana.airdrop_sol_async(wallet1.pubkey, airdrop_amount1, "finalized")
-    tr_w2 = Solana.airdrop_sol_async(wallet2.pubkey, airdrop_amount2, "finalized")
+    tr_w1 = Solana.airdrop_sol_async(wallet1.account.Pubkey, airdrop_amount1, "finalized")
+    tr_w2 = Solana.airdrop_sol_async(wallet2.account.Pubkey, airdrop_amount2, "finalized")
 
     @test tr_w1 !== nothing
     @test tr_w2 !== nothing
@@ -36,8 +36,8 @@ using Test, HTTP
     @info "Airdrop transactions completed"
 
     # TEST get_balance
-    balance1 = Solana.get_balance(wallet1.pubkey)
-    balance2 = Solana.get_balance(wallet2.pubkey)
+    balance1 = Solana.get_balance(wallet1.account.Pubkey)
+    balance2 = Solana.get_balance(wallet2.account.Pubkey)
 
     @test balance1 == airdrop_amount1
     @test balance2 == airdrop_amount2

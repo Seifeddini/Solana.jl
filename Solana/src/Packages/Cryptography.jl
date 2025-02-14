@@ -1,5 +1,5 @@
 
-function base58_encode(data::Vector{UInt8})
+function base58_encode(data::Vector{UInt8})::String
     alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
     num = BigInt(0)
 
@@ -9,7 +9,7 @@ function base58_encode(data::Vector{UInt8})
     end
 
     # Encode to Base58
-    encoded = ""
+    encoded::String = ""
     while num > 0
         num, remainder = divrem(num, 58)
         encoded = alphabet[remainder+1] * encoded

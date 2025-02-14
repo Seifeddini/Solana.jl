@@ -39,8 +39,8 @@ function create_wallet(name::String)::Wallet
     val = run(`solana-keygen new --force --no-bip39-passphrase --outfile  "~"/SolWallets/$name.json`)
     @debug "New Wallet created"
 
-    private_key, public_key = read_wallet_keys("~/SolWallets/$name.json")
-
+    private_key::String, public_key::String = read_wallet_keys("~/SolWallets/$name.json")
+    @assert private_key isa String && public_key isa String "Private key or Public Key is not a string"
     return Wallet(name, public_key, private_key)
 end
 

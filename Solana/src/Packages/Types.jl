@@ -1,3 +1,29 @@
+System_Programm = "11111111111111111111111111111111";
+
+struct Account
+    Pubkey::String
+    Data::Vector{UInt8}
+    Executable::Bool
+    Lamports::UInt64
+    Owner::String
+    function Account(Pubkey::String, Data::Vector{UInt8}, Executable::Bool, Lamports::UInt64, Owner::String)
+        return new(Pubkey, Data, Executable, Lamports, Owner)
+    end
+end
+export Account
+
+struct Wallet
+    account::Account
+    name::String
+    private_key::String
+    function Wallet(account::Account, name::String, private_key::String)
+        return new(account, name, private_key)
+    end
+    function Wallet(name::String, Pubkey::String, PrivateKey::String, Balance::UInt64=UInt64(0))
+        return new(Account(Pubkey, Vector{UInt8}(undef, 0), false, Balance, System_Programm), name, PrivateKey)
+    end
+end
+export Wallet
 
 struct AccountMeta
     pubkey::Vector{UInt8}
@@ -33,13 +59,6 @@ struct Transaction
     message::Message
 end
 export Transaction
-
-struct Wallet
-    name::String
-    pubkey::String
-    secretkey::String
-end
-export Wallet
 
 struct TokenAccount
     account_address::String
