@@ -8,6 +8,20 @@ using Solana
 
 using Test, HTTP, Serialization
 
+@testset failfast = true "transfer_sol" begin
+    # TODO Create Mock-Wallets
+    wallet_A::Wallet = Solana.create_wallet("TestWalletA")
+    wallet_B::Wallet = Solana.create_wallet("TestWalletB")
+    # TODO Fund Mock-Wallets
+    wait(Solana.airdrop_sol_async(wallet_A.account.Pubkey, 1_000_000_000, "finalized"))
+    # TODO Transfer SOL between Mock-Wallets
+    tr = Solana.transfer_sol_async(wallet_A, wallet_B.account.Pubkey, 1_000_000)
+    # TODO Verify Transfer
+    @test tr !== nothing
+    @test Solana.get_balance(wallet_A.account.Pubkey) == 999_000_000
+    @test Solana.get_balance(wallet_B.account.Pubkey) == 1_000_000
+end
+
 @testset "CompactU16 and Compact Array Tests" begin
     @testset "CompactU16 Encoding/Decoding" begin
         test_values = [0, 127, 128, 255, 16383, 16384, 65535]
