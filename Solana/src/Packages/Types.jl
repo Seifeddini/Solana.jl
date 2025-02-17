@@ -13,9 +13,9 @@ end
 export Account
 
 struct Wallet
-    account::Account
-    name::String
-    private_key::String
+    Account::Account
+    Name::String
+    PrivateKey::String
     function Wallet(account::Account, name::String, private_key::String)
         return new(account, name, private_key)
     end
