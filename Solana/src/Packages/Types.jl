@@ -1,4 +1,4 @@
-System_Programm = "11111111111111111111111111111111";
+SystemProgramm = "11111111111111111111111111111111";
 
 struct Account
     Pubkey::String
@@ -20,62 +20,72 @@ struct Wallet
         return new(account, name, private_key)
     end
     function Wallet(name::String, Pubkey::String, PrivateKey::String, Balance::UInt64=UInt64(0))
-        return new(Account(Pubkey, Vector{UInt8}(undef, 0), false, Balance, System_Programm), name, PrivateKey)
+        return new(Account(Pubkey, Vector{UInt8}(undef, 0), false, Balance, SystemProgramm), name, PrivateKey)
     end
 end
 export Wallet
 
 struct AccountMeta
-    # string
-    pubkey::Vector{UInt8}
-    # bool
-    is_signer::UInt8
-    # bool
-    is_writable::UInt8
+    # COMPRESS: 32-byte Vector
+    Pubkey::String
+    # COMPRESS: 1-byte
+    IsSigner::Bool
+    # COMPRESS: 1-byte
+    IsWritable::Bool
 end
 export AccountMeta
 
 struct Instruction
-    program_id::String
-    accounts::Vector{AccountMeta}
-    data::Vector{UInt8}
+    # COMPRESS: 1 byte index
+    # the pubkey of the program that executes this instruction.
+    ProgramId::String
+    # Involved Transactions
+    # COMPRESS: Compact Array of 1 byte
+    Accounts::Vector{AccountMeta}
+    # COMPRESS: Compact Array
+    Data::Vector{UInt8}
 end
 export Instruction
 
 struct CompiledInstructions
     # Index into the transaction keys array indicating the program account that executes this instruction.
-    program_id_index::UInt8
+    ProgramIdIndex::UInt8
     # Ordered indices into the transaction keys array indicating which accounts to pass to the program.
-    accounts::Vector{UInt8}
+    Accounts::Vector{UInt8}
     # The program input data.
-    data::Vector{UInt8}
+    Data::Vector{UInt8}
 end
+export CompiledInstructions
 
 struct MessageHeader
     # The number of signatures required for this message to be considered
     # valid. The signers of those signatures must match the first
     # `num_required_signatures` of [`Message::account_keys`].
-    num_required_signatures::UInt8
+    NumRequiredSignatures::UInt8
 
     # The last `num_readonly_signed_accounts` of the signed keys are read-only
     # accounts.
-    num_readonly_signed_accounts::UInt8
+    NumReadonlySignedAccounts::UInt8
 
     # The last `num_readonly_unsigned_accounts` of the unsigned keys are
     # read-only accounts
-    num_readonly_unsigned_accounts::UInt8
+    NumReadonlyUnsignedAccounts::UInt8
 end
 export MessageHeader
 
 struct Message
     # Specifies the number of signer and read-only accounts
-    header::Vector{UInt8}
+    # COMPRESS: 3-byte vector
+    Header::MessageHeader
     # An array of account addresses required by the instructions on the transaction. Stored in Compact_Array
-    account_keys::Vector{UInt8}
+    # COMPRESS: size * 32-byte vector Compact Array
+    AccountKeys::Vector{String}
     # Acts as the timestamp for the transaction. Expires after 150 Blocks
-    recent_blockhash::Vector{UInt8}
+    # COMPRESS: 32-byte vector
+    RecentBlockhash::String
     # Array of Instructions to be executed. Stored in Compact_Array. Elements are CompiledInstructions
-    instructions::Vector{UInt8}
+    # COMPRESS: byte-vector Compact Array
+    Instructions::Vector{Instruction}
 end
 export Message
 
@@ -84,22 +94,24 @@ export Message
 # Metadata + Accounts in Messages max-size: maximum of 35, 32 bytes each
 struct Transaction
     # array of signatures included in Instructions
-    signatures::Vector{UInt8}
+    # COMPRESS: 64-byte vector Compact Array
+    Signatures::Vector{String}
     # List of instructions to be processed
-    message::Vector{UInt8}
+    # COMPRESS: byte-vector
+    Message::Message
 end
 export Transaction
 
 struct TokenAccount
-    account_address::String
-    signature::String
+    AccountAddress::String
+    Signature::String
 end
 export TokenAccount
 
 struct Token
-    address::String
-    program::String
-    decimals::Int
-    signature::String
+    Address::String
+    Program::String
+    Decimals::Int
+    Signature::String
 end
 export Token
