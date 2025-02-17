@@ -15,15 +15,36 @@ using Test, HTTP, Serialization
     # TODO Fund Mock-Wallets
     wait(Solana.airdrop_sol_async(wallet_A.Account.Pubkey, 1_000_000_000, "finalized"))
 
+    instructions::Array{Instruction} = []
+    num_readonly_signed_accounts::UInt8 = UInt8(0)
+    num_readonly_unsigned_accounts::UInt8 = UInt8(0)
+    amount::UInt64 = UInt64(1_000_000)
+
+    # fill Instructions
+
+    instruction_id = 2
+    data_buffer = IOBuffer()
+    write(data_buffer, UInt32(instruction_id))
+    write(data_buffer, UInt64(amount))
+
+    data = take!(data_buffer)
+    
+    push!(instructions, Instruction(solana_programms["system"], [AccountMeta(wallet_A.Account.Pubkey, true, true), AccountMeta(wallet_B.Account.Pubkey, false, true)], data))
+
+    # TODO - WAL-31 - automate the num_readonly.... by counting instructions
+
     # TODO create Transaction and test
-    transaction::Transaction = Solana.create_transaction([wallet_A], [wallet_B.Account.Pubkey], UInt64(1_000_000))
+    transaction::Transaction = Solana.create_transaction([wallet_A], [wallet_B.Account.Pubkey], instructions, num_readonly_signed_accounts, num_readonly_unsigned_accounts)
 
     @testset failfast = true "create transaction" begin
         @test transaction !== nothing
         @test size(transaction.Signatures, 1) == 1
-        @test transaction.Signatures[1] === wallet_A.PrivateKey    
-        
+        @test transaction.Signatures[1] === wallet_A.PrivateKey 
     end
+
+    transaction_string = serialize(transaction)
+    transaction_bytes = base58_decode(transaction_string)
+    # TODO test for correctness
 
     # # TODO Transfer SOL between Mock-Wallets
     # @info "Starting Transaction..."
