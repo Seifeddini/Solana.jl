@@ -4,6 +4,7 @@ module Solana
 include("./Packages/Types.jl")
 include("./Packages/GeneralServices.jl")
 include("./Packages/Cryptography.jl")
+include("./Packages/TransactionServices.jl")
 include("./Packages/RPCServices.jl")
 include("./Packages/TestValidatorServices.jl")
 
