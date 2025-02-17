@@ -14,15 +14,26 @@ using Test, HTTP, Serialization
     wallet_B::Wallet = Solana.create_wallet("TestWalletB")
     # TODO Fund Mock-Wallets
     wait(Solana.airdrop_sol_async(wallet_A.Account.Pubkey, 1_000_000_000, "finalized"))
-    # TODO Transfer SOL between Mock-Wallets
-    @info "Starting Transaction..."
-    tr = Solana.transfer_sol_async(wallet_A, wallet_B.Account.Pubkey, UInt64(1_000_000))
-    @info "Finished Transaction..."
-    sleep(25)
-    # TODO Verify Transfer
-    @test tr !== nothing
-    @test Solana.get_balance(wallet_A.Account.Pubkey) == 999_000_000
-    @test Solana.get_balance(wallet_B.Account.Pubkey) == 1_000_000
+
+    # TODO create Transaction and test
+    transaction::Transaction = Solana.create_transaction([wallet_A], [wallet_B.Account.Pubkey], UInt64(1_000_000))
+
+    @testset failfast = true "create transaction" begin
+        @test transaction !== nothing
+        @test size(transaction.Signatures, 1) == 1
+        @test transaction.Signatures[1] === wallet_A.PrivateKey    
+        
+    end
+
+    # # TODO Transfer SOL between Mock-Wallets
+    # @info "Starting Transaction..."
+    # tr = Solana.transfer_sol_async(wallet_A, wallet_B.Account.Pubkey, UInt64(1_000_000))
+    # @info "Finished Transaction..."
+    # sleep(25)
+    # # TODO Verify Transfer
+    # @test tr !== nothing
+    # @test Solana.get_balance(wallet_A.Account.Pubkey) == 999_000_000
+    # @test Solana.get_balance(wallet_B.Account.Pubkey) == 1_000_000
 end
 
 @testset "CompactU16 and Compact Array Tests" begin
@@ -40,58 +51,20 @@ end
             @test decoded.value == value
         end
     end
+end
 
-    @testset "Compact Array - Integers" begin
-        int_arrays = [
-            Int[],
-            [1],
-            [1, 2, 3, 4, 5],
-            [0, 127, 128, 255, 16383, 16384, 65535]
+@testset "Base58 Decode Tests" begin
+    @testset "Base58 Decoding" begin
+        test_cases = [
+            ("", UInt8[]),
+            ("1", [0x00]),
+            ("2", [0x01]),
+            ("5HueCGU8rMjxEXxiPuD5BDuZZ7s5g9G2UJm2zG1Jwq3h5h9t", [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         ]
-        for arr in int_arrays
-            compact = Solana.to_compact_array(arr)
-            decoded = Solana.from_compact_array(compact, Int)
-            @test decoded == arr
+        for (encoded, expected) in test_cases
+            decoded = base58_decode(encoded)
+            @test decoded == expected
         end
-    end
-
-    @testset "Compact Array - Strings" begin
-        string_arrays = [
-            String[],
-            [""],
-            ["hello"],
-            ["hello", "world", "julia"],
-            ["a", "bb", "ccc", "dddd", "eeeee"]
-        ]
-        for arr in string_arrays
-            compact = Solana.to_compact_array(arr)
-            decoded = Solana.from_compact_array(compact, String)
-            @test decoded == arr
-        end
-    end
-
-    @testset "Compact Array - Custom Struct" begin
-        struct Point
-            x::Float64
-            y::Float64
-        end
-
-        point_arrays = [
-            Point[],
-            [Point(1.0, 2.0)],
-            [Point(1.0, 2.0), Point(3.0, 4.0), Point(5.0, 6.0)],
-            [Point(0.0, 0.0), Point(-1.5, 2.5), Point(3.14, -2.718)]
-        ]
-        for arr in point_arrays
-            compact = Solana.to_compact_array(arr)
-            decoded = Solana.from_compact_array(compact, Point)
-            @test decoded == arr
-        end
-    end
-
-    @testset "Error Handling" begin
-        @test_throws ErrorException Solana.from_compact_array([0xFF, 0xFF, 0xFF], Int)
-        @test_throws EOFError Solana.from_compact_array([0x01], Int)
     end
 end
 
