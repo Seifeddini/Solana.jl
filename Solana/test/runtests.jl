@@ -13,13 +13,16 @@ using Test, HTTP, Serialization
     wallet_A::Wallet = Solana.create_wallet("TestWalletA")
     wallet_B::Wallet = Solana.create_wallet("TestWalletB")
     # TODO Fund Mock-Wallets
-    wait(Solana.airdrop_sol_async(wallet_A.account.Pubkey, 1_000_000_000, "finalized"))
+    wait(Solana.airdrop_sol_async(wallet_A.Account.Pubkey, 1_000_000_000, "finalized"))
     # TODO Transfer SOL between Mock-Wallets
-    tr = Solana.transfer_sol_async(wallet_A, wallet_B.account.Pubkey, 1_000_000)
+    @info "Starting Transaction..."
+    tr = Solana.transfer_sol_async(wallet_A, wallet_B.Account.Pubkey, UInt64(1_000_000))
+    @info "Finished Transaction..."
+    sleep(25)
     # TODO Verify Transfer
     @test tr !== nothing
-    @test Solana.get_balance(wallet_A.account.Pubkey) == 999_000_000
-    @test Solana.get_balance(wallet_B.account.Pubkey) == 1_000_000
+    @test Solana.get_balance(wallet_A.Account.Pubkey) == 999_000_000
+    @test Solana.get_balance(wallet_B.Account.Pubkey) == 1_000_000
 end
 
 @testset "CompactU16 and Compact Array Tests" begin

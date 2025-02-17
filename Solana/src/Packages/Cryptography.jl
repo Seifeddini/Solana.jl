@@ -70,21 +70,65 @@ function decode_compact_u16(bytes::Vector{UInt8})
     return read(io, CompactU16).value
 end
 
-function to_compact_array(arr::Array{T}) where {T}
+function to_compact_array(arr::Array{T}, ::Type{U}) where {T,U}
     io = IOBuffer()
     write(io, CompactU16(UInt16(length(arr))))
-    for elem in arr
-        serialize(io, elem)
-    end
+
+    write(io, serialize(arr, U))
     return take!(io)
 end
 
-function from_compact_array(bytes::Vector{UInt8}, ::Type{T}) where {T}
-    io = IOBuffer(bytes)
-    length = read(io, CompactU16).value
-    result = Vector{T}(undef, length)
-    for i in 1:length
-        result[i] = deserialize(io)
+function serialize(arr::Array{T}, ::Type{U}) where {T,U}
+    buffer = IOBuffer()
+
+    for elem in arr
+        if elem isa AbstractArray
+            serialized_elem = serialize(elem, U)
+            write(buffer, serialized_elem)
+        else
+            write(buffer, convert(U, elem))
+        end
     end
-    return result
+
+    return take!(buffer)
+end
+
+function serialize(arr::Array{T}) where {T}
+    buffer = IOBuffer()
+
+    for elem in arr
+        if elem isa AbstractArray
+            serialized_elem = serialize(elem)
+            write(buffer, serialized_elem)
+        else
+            write(buffer, elem)
+        end
+    end
+
+    return take!(buffer)
+end
+
+function serialize_struct(s::T, ::Type{U}) where {T,U}
+    buffer = IOBuffer()
+    fieldnames = fieldnames(T)
+    for field in fieldnames
+        value = getfield(s, field)
+        if isstruct(value)
+            serialized_value = serialize_struct(value, U)
+            write(buffer, serialized_value)
+        elseif value isa AbstractArray
+            serialized_value = serialize(value, U)
+            write(buffer, serialized_value)
+        else
+            serialize(buffer, convert(U, value))
+        end
+    end
+    return take!(buffer)
+end
+function isstruct(x)
+    return x isa DataType && isstructtype(x)
+end
+
+function isstructtype(T::DataType)
+    return T <: AbstractDict || T <: AbstractArray || T <: Tuple || T <: NamedTuple || T <: Struct
 end

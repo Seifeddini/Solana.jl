@@ -1,4 +1,3 @@
-
 function get_balance(pubkey, status="confirmed")
     # Create the payload for the JSON RPC request
     payload = Dict(
@@ -146,6 +145,49 @@ function get_latest_blockhash()
     end
 end
 
+function generate_instruction(accounts::Array{AccountMeta}, program_id::String, data::Vector{UInt8})
+    return Instruction(program_id, accounts, data)
+end
+
+function transfer_sol_generate_message(from_wallet::Wallet, to_pubkey::String, amount::UInt64)
+
+    # create message
+    message_header::MessageHeader = MessageHeader(UInt8(1), UInt8(0), UInt8(0))
+
+    account_keys::Array{String} = []
+    push!(account_keys, from_wallet.Account.Pubkey)
+    push!(account_keys, to_pubkey)
+
+    # TODO WAL-29 - Create Strategy for Recent Blockhash choosing
+    recent_blockhash::String = get_latest_blockhash()["value"]["blockhash"]
+
+    instructions::Array{Instruction} = []
+    # create transfer instruction
+
+    accounts::Array{AccountMeta} = []
+
+    push!(accounts, AccountMeta((Vector{UInt8})(from_wallet.Account.Pubkey), (UInt8)(true), (UInt8)(true)))
+    push!(accounts, AccountMeta((Vector{UInt8})(to_pubkey), (UInt8)(false), (UInt8)(true)))
+    instruction_id = 2
+
+    data_buffer = IOBuffer()
+    write(data_buffer, UInt32(instruction_id))
+    write(data_buffer, UInt64(amount))
+    data::Vector{UInt8} = take!(data_buffer)
+
+
+    instruction::Instruction = Instruction((Vector{UInt8})(solana_programms["system"]), serialize(accounts, UInt32), data)
+    push!(instructions, instruction)
+
+    ser_instructions = to_compact_array(instructions, UInt32)
+    ser_account_keys = to_compact_array(account_keys, UInt32)
+    ser_messsage_header = serialize_struct(message_header, UInt8)
+    ser_recent_blockhash = Vector{UInt8}(recent_blockhash)
+    @assert length(ser_recent_blockhash) == 32 "ser_recent_blockhash must have exactly 32 bytes"
+    message::Message = Message(ser_messsage_header, ser_account_keys, ser_recent_blockhash, ser_instructions)
+    return message
+end
+
 function transfer_sol_async(from_wallet::Wallet, to_pubkey::String, amount::UInt64)
     # See for help: https://solana.com/de/docs/core/transactions
 
@@ -153,44 +195,19 @@ function transfer_sol_async(from_wallet::Wallet, to_pubkey::String, amount::UInt
     signatures::Array{String} = []
     push!(signatures, from_wallet.PrivateKey)
 
-    # create message
-    message_header::MessageHeader = MessageHeader(UInt8(1), UInt8(0), UInt8(0))
-    account_keys::Array{String} = []
+    message = transfer_sol_generate_message(from_wallet, to_pubkey, amount)
 
-    push!(account_keys, from_wallet.Account.Pubkey)
-    push!(account_keys, to_pubkey)
-
-    # TODO WAL-29 - Create Strategy for Recent Blockhash choosing
-    recent_blockhash = get_latest_blockhash()
-
-    instructions::Array{Instruction} = []
-
-    # create transfer instruction
-    account_keys::Array{AccountMeta} = []
-
-    push!(account_keys, AccountMeta(from_wallet.Account.Pubkey, true, true))
-    push!(account_keys, AccountMeta(to_pubkey, false, true))
-
-    instruction_id = 2
-    data::Vector{UInt8} = Vector{UInt8}(undef, 4 + 8)
-    data[1:4] = UInt32(instruction_id)
-    data[5:end] = UInt64(amount)
-
-    instruction::Instruction = Instruction(solana_programms["system"], account_keys, data)
-    push!(instructions, instruction)
-
-    instructions = to_compact_array(instructions)
-    account_keys = to_compact_array(account_keys)
-    message::Message = Message(message_header, account_keys, recent_blockhash, instructions)
-
-    signatures = to_compact_array(signatures)
-    transaction = Transaction(signatures, message)
+    ser_signatures = serialize(signatures, UInt64)
+    ser_message = Vector{UInt8}(message)
+    transaction::Transaction = Transaction(ser_signatures, set_message)
 
     # required encoding for transactions
-    transaction_string = String(transaction)
+    transaction_bytes = serialize_struct(transaction)
+
+    transaction_string = base58_encode(transaction_bytes)
 
     # Send the transaction
-    data = Dict(
+    http_data = Dict(
         "jsonrpc" => "2.0",
         "id" => 1,
         "method" => "sendTransaction",
@@ -202,7 +219,7 @@ function transfer_sol_async(from_wallet::Wallet, to_pubkey::String, amount::UInt
             "POST",
             ENV["RPC_URL"],
             ["Content-Type" => "application/json"],
-            body=JSON.json(data)
+            body=JSON.json(http_data)
         )
 
         body = JSON.parse(String(response.body))

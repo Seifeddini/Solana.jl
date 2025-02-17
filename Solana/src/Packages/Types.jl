@@ -26,14 +26,17 @@ end
 export Wallet
 
 struct AccountMeta
-    pubkey::String
-    is_signer::Bool
-    is_writable::Bool
+    # string
+    pubkey::Vector{UInt8}
+    # bool
+    is_signer::UInt8
+    # bool
+    is_writable::UInt8
 end
 export AccountMeta
 
 struct Instruction
-    program_id::Vector{UInt8}
+    program_id::String
     accounts::Vector{AccountMeta}
     data::Vector{UInt8}
 end
@@ -66,13 +69,13 @@ export MessageHeader
 
 struct Message
     # Specifies the number of signer and read-only accounts
-    header::MessageHeader
+    header::Vector{UInt8}
     # An array of account addresses required by the instructions on the transaction. Stored in Compact_Array
-    account_keys::Vector{Vector{UInt8}}
+    account_keys::Vector{UInt8}
     # Acts as the timestamp for the transaction. Expires after 150 Blocks
     recent_blockhash::Vector{UInt8}
     # Array of Instructions to be executed. Stored in Compact_Array. Elements are CompiledInstructions
-    instructions::Vector{Instruction}
+    instructions::Vector{UInt8}
 end
 export Message
 
@@ -81,9 +84,9 @@ export Message
 # Metadata + Accounts in Messages max-size: maximum of 35, 32 bytes each
 struct Transaction
     # array of signatures included in Instructions
-    signatures::Vector{Vector{UInt8}}
+    signatures::Vector{UInt8}
     # List of instructions to be processed
-    message::Message
+    message::Vector{UInt8}
 end
 export Transaction
 
