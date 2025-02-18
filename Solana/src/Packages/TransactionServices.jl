@@ -253,8 +253,15 @@ function process_instructions(instructions::Array{Instruction})
     num_readonly_signed_accounts::UInt8 = 0
     num_readonly_unsigned_accounts::UInt8 = 0
     wallets::Array{String} = []
+    wallets_check = Dict()
 
-    # TODO implement
+    for instruction in instructions
+        if !haskey(wallets_check, instruction.ProgramId)
+            push!(wallets, instruction.ProgramId)
+            wallets_check[instruction.ProgramId] = true
+        end
+        for sub_instr in instruction.Accounts
+    end
 
     return wallets, num_readonly_signed_accounts, num_readonly_unsigned_accounts
 end
