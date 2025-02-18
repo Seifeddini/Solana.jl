@@ -249,8 +249,20 @@ function serialize_transaction(transaction::Transaction)
     return transaction_string
 end
 
+function process_instructions(instructions::Array{Instruction})
+    num_readonly_signed_accounts::UInt8 = 0
+    num_readonly_unsigned_accounts::UInt8 = 0
+    wallets::Array{String} = []
+
+    # TODO implement
+
+    return wallets, num_readonly_signed_accounts, num_readonly_unsigned_accounts
+end
+
 # Create Transaction
-function create_transaction(signer_wallets::Array{Wallet}, target_wallets::Array{Wallet}, instructions::Array{Instruction}, num_readonly_signed_accounts::UInt8, num_readonly_unsigned_accounts::UInt8)::String
+function create_transaction(signatures::Array{String}, instructions::Array{Instruction})::String
+
+    wallets, num_readonly_signed_accounts, num_readonly_unsigned_accounts = process_instructions(instructions)
 
     transaction::Transaction = Transaction(create_signature_list(signer_wallets), create_message(signer_wallets, target_wallets, instructions, num_readonly_signed_accounts, num_readonly_unsigned_accounts))
 
