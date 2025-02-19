@@ -140,7 +140,7 @@ function decode_compact_u16(bytes::Vector{UInt8})
     return read(io, CompactU16).value
 end
 
-function to_compact_array(arr::Array{T}) where {T,U}
+function to_compact_array(arr::Array{T}) where {T}
     io = IOBuffer()
     write(io, CompactU16(UInt16(length(arr))))
 
@@ -182,8 +182,8 @@ function serialize_instruction(collector::Array, instruction::Instruction, pubke
     buffer = IOBuffer()
     program_index::UInt8 = 0
     account_indices::Array{UInt8} = []
-    
-    index = 0;
+
+    index = 0
     for account in pubkeys
         if program_index == 0 && account == instruction.ProgramId
             program_index = index
@@ -199,7 +199,7 @@ function serialize_instruction(collector::Array, instruction::Instruction, pubke
     end
 
     write(buffer, program_index)
-    
+
     for account_index in account_indices
         write(buffer, account_index)
     end
@@ -261,6 +261,16 @@ function process_instructions(instructions::Array{Instruction})
             wallets_check[instruction.ProgramId] = true
         end
         for sub_instr in instruction.Accounts
+            if !haskey(wallets_check, sub_instr.Pubkey)
+                if sub_instr.IsSigner && !sub_instr.IsWritable
+                    num_readonly_signed_accounts += 1
+                elseif !sub_instr.IsSigner && !sub_instr.IsWritable
+                    num_readonly_unsigned_accounts += 1
+                end
+                push!(wallets, sub_instr.Pubkey)
+                wallets_check[sub_instr.Pubkey] = true
+            end
+        end
     end
 
     return wallets, num_readonly_signed_accounts, num_readonly_unsigned_accounts
@@ -271,38 +281,21 @@ function create_transaction(signatures::Array{String}, instructions::Array{Instr
 
     wallets, num_readonly_signed_accounts, num_readonly_unsigned_accounts = process_instructions(instructions)
 
-    transaction::Transaction = Transaction(create_signature_list(signer_wallets), create_message(signer_wallets, target_wallets, instructions, num_readonly_signed_accounts, num_readonly_unsigned_accounts))
+    transaction::Transaction = Transaction(signatures, create_message(signatures, wallets, instructions, num_readonly_signed_accounts, num_readonly_unsigned_accounts))
 
     # TODO insert size checks
 
     return transaction
 end
 
-# Create Signature-List
-function create_signature_list(wallets::Array{Wallet})
-    # Each signature is a 64-byte string
-    signatures::Array{String} = []
-
-    for wallet in wallets
-        @assert length(wallet.Account.PrivateKey) == 64 "Private Key must have exactly 64 bytes"
-        push!(signatures, wallet.Account.PrivateKey)
-    end
-    
-    return signatures
-end
-
 # Create Message
-function create_message(signer_wallets::Array{Wallet},  target_wallets::Array{String}, Instructions::Array{Instruction}, num_readonly_signed_accounts::UInt8, num_readonly_unsigned_accounts::UInt8)::Message
+function create_message(signatures::Array{String}, wallets::Array{String}, Instructions::Array{Instruction}, num_readonly_signed_accounts::UInt8, num_readonly_unsigned_accounts::UInt8)::Message
     # Create Message Header
-    required_signatures = size(signer_wallets, 1)
+    required_signatures = size(signatures, 1)
     header::MessageHeader = MessageHeader((UInt8)(required_signatures), num_readonly_signed_accounts, num_readonly_unsigned_accounts)
 
     # Create Account keys
-    AccountKeys::Array{String} = []
-    for wallet in signer_wallets
-        push!(AccountKeys, wallet.Account.Pubkey)
-    end
-    push!(AccountKeys, target_wallets...)
+    AccountKeys::Array{String} = wallets
 
     # Recent Blockhash
     RecentBlockhash::String = get_latest_blockhash()["value"]["blockhash"]

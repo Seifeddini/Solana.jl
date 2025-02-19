@@ -28,18 +28,16 @@ using Test, HTTP, Serialization
     write(data_buffer, UInt64(amount))
 
     data = take!(data_buffer)
-    
-    push!(instructions, Instruction(solana_programms["system"], [AccountMeta(wallet_A.Account.Pubkey, true, true), AccountMeta(wallet_B.Account.Pubkey, false, true)], data))
 
-    # TODO - WAL-31 - automate the num_readonly.... by counting instructions
+    push!(instructions, Instruction(Solana.solana_programms["system"], [AccountMeta(wallet_A.Account.Pubkey, true, true), AccountMeta(wallet_B.Account.Pubkey, false, true)], data))
 
     # TODO create Transaction and test
-    transaction::Transaction = Solana.create_transaction([wallet_A], [wallet_B.Account.Pubkey], instructions, num_readonly_signed_accounts, num_readonly_unsigned_accounts)
+    transaction::Transaction = Solana.create_transaction([wallet_A.PrivateKey], instructions)
 
     @testset failfast = true "create transaction" begin
         @test transaction !== nothing
         @test size(transaction.Signatures, 1) == 1
-        @test transaction.Signatures[1] === wallet_A.PrivateKey 
+        @test transaction.Signatures[1] === wallet_A.PrivateKey
     end
 
     transaction_string = serialize(transaction)
