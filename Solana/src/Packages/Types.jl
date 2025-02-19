@@ -46,22 +46,25 @@ struct CompiledInstructions
 end
 
 struct MessageHeader
+    # The signers of those signatures must match the first numRequiredSignatures of the account keys
     NumRequiredSignatures::UInt8
+    # The last numReadonlySignedAccounts of the signed keys are read-only accounts
     NumReadonlySignedAccounts::UInt8
+    # The last numReadonlyUnsignedAccounts of the unsigned keys are read-only accounts
     NumReadonlyUnsignedAccounts::UInt8
 end
 export MessageHeader
 
 struct Message
     Header::MessageHeader
-    AccountKeys::Vector{Vector{UInt8}}
-    RecentBlockhash::Vector{UInt8}
+    AccountKeys::Vector{String}
+    RecentBlockhash::String
     Instructions::Vector{Instruction}
 end
 export Message
 
 struct Transaction
-    Signatures::Vector{Vector{UInt8}}
+    Signatures::Vector{String}
     Message::Message
 end
 export Transaction

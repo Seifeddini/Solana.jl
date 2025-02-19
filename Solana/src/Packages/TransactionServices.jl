@@ -230,7 +230,7 @@ function serialize_transaction(transaction::Transaction)
     # serialize Instructions
     instruction_array::Array{Vector{UInt8}} = []
     for instruction::Instruction in transaction.Message.Instructions
-        serialize_instruction(instruction_array, instruction, instruction.Message.AccountKeys)
+        serialize_instruction(instruction_array, instruction, transaction.Message.AccountKeys)
     end
     instruction_bytes = to_compact_array(instruction_array)
     # Serialize Message
@@ -249,26 +249,75 @@ function serialize_transaction(transaction::Transaction)
     return transaction_string
 end
 
+function insert_wallet(wallets::Array{String}, account::AccountMeta, first_ind::Array{Int})
+
+    first_signed_ro = first_ind[1]
+    first_unsigned_ro = first_ind[2]
+
+    if account.IsSigner && !account.IsWritable
+        if first_signed_ro == -1
+            push!(wallets, account.Pubkey)
+            first_signed_ro = 1
+        else
+            insert!(wallets, first_signed_ro, account.Pubkey)
+        end
+    elseif !account.IsSigner && !account.IsWritable
+        if first_unsigned_ro == -1
+            push!(wallets, account.Pubkey)
+            first_unsigned_ro = 1
+        else
+            insert!(wallets, first_unsigned_ro, account.Pubkey)
+        end
+    else
+        if account.IsSigner
+            insert!(wallets, 1, account.Pubkey)
+            if first_signed_ro != -1
+                first_signed_ro += 1
+            end
+            if first_unsigned_ro != -1
+                first_unsigned_ro += 1
+            end
+        else
+            if first_unsigned_ro < 1
+                push!(wallets, account.Pubkey)
+                if first_unsigned_ro != -1
+                    first_unsigned_ro += 1
+                end
+            else
+                insert!(wallets, first_unsigned_ro, account.Pubkey)
+                first_unsigned_ro += 1
+            end
+        end
+    end
+
+    first_ind[1] = first_signed_ro
+    first_ind[2] = first_unsigned_ro
+end
+
 function process_instructions(instructions::Array{Instruction})
     num_readonly_signed_accounts::UInt8 = 0
     num_readonly_unsigned_accounts::UInt8 = 0
     wallets::Array{String} = []
     wallets_check = Dict()
 
+    first_ind = [1, 1]
+
     for instruction in instructions
         if !haskey(wallets_check, instruction.ProgramId)
             push!(wallets, instruction.ProgramId)
             wallets_check[instruction.ProgramId] = true
         end
-        for sub_instr in instruction.Accounts
-            if !haskey(wallets_check, sub_instr.Pubkey)
-                if sub_instr.IsSigner && !sub_instr.IsWritable
+        for account in instruction.Accounts
+            if !haskey(wallets_check, account.Pubkey)
+                if account.IsSigner && !account.IsWritable
+                    # TODO insert into last position that is signed and writable
                     num_readonly_signed_accounts += 1
-                elseif !sub_instr.IsSigner && !sub_instr.IsWritable
+                elseif !account.IsSigner && !account.IsWritable
+                    # TODO insert into last position
                     num_readonly_unsigned_accounts += 1
                 end
-                push!(wallets, sub_instr.Pubkey)
-                wallets_check[sub_instr.Pubkey] = true
+                insert_wallet(wallets, account, first_ind)
+                wallets_check[account.Pubkey] = true
             end
         end
     end
@@ -277,11 +326,11 @@ function process_instructions(instructions::Array{Instruction})
 end
 
 # Create Transaction
-function create_transaction(signatures::Array{String}, instructions::Array{Instruction})::String
+function create_transaction(instructions::Array{Instruction})::Transaction
 
     wallets, num_readonly_signed_accounts, num_readonly_unsigned_accounts = process_instructions(instructions)
 
-    transaction::Transaction = Transaction(signatures, create_message(signatures, wallets, instructions, num_readonly_signed_accounts, num_readonly_unsigned_accounts))
+    transaction::Transaction = Transaction([], create_message(signatures, wallets, instructions, num_readonly_signed_accounts, num_readonly_unsigned_accounts))
 
     # TODO insert size checks
 
