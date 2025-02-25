@@ -1,4 +1,7 @@
-using Serialization
+using Serialization, PyCall
+
+@pyimport nacl.signing as signing
+@pyimport base58
 
 function base58_encode(data::Vector{UInt8})::String
     alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -71,4 +74,41 @@ function base58_decode(encoded::String)
     # Reverse to get the original byte order
     return reverse(decoded)
 end
+
+# Generate keypair
+signer = signing.SigningKey.generate()
+verify_key = signer.verify_key
+
+# Convert to Solana format
+secret_key = base58.b58encode(signer.encode() + verify_key.encode())
+public_key = base58.b58encode(verify_key.encode())
+
+println("Public: ", public_key)
+println("Secret: ", secret_key)
+
+@pyimport solana.rpc.async_api as async_api
+@pyimport solana.transaction as transaction
+
+function sign_transaction(instructions::Vector{Dict}, signer::PyObject)
+    client = async_api.AsyncClient("https://api.devnet.solana.com")
+    blockhash = pycall(client.get_latest_blockhash, PyObject)
+
+    txn = transaction.Transaction().add([
+        transaction.TransactionInstruction(
+            keys=[
+                transaction.AccountMeta(py"instruction['accounts'][0]['pubkey']",
+                    py"instruction['accounts'][0]['is_signer']",
+                    py"instruction['accounts'][0]['is_writable']"),
+                transaction.AccountMeta(py"instruction['accounts'][1]['pubkey']",
+                    false, true)
+            ],
+            program_id=py"instruction['program_id']",
+            data=py"base64.b64decode(instruction['data'])"
+        ) for instruction in instructions
+    ])
+
+    txn.sign(signer)
+    return txn
+end
+
 
