@@ -1,87 +1,6 @@
 
-# function serialize(arr::Array{T}, ::Type{U}) where {T,U}
-#     buffer = IOBuffer()
 
-#     for elem in arr
-#         if elem isa AbstractArray
-#             serialized_elem = serialize(elem, U)
-#             write(buffer, serialized_elem)
-#         else
-#             write(buffer, convert(U, elem))
-#     end
-
-#     return take!(buffer)
-# end
-
-# function serialize_struct(s::T, ::Type{U}) where {T,U}
-#     buffer = IOBuffer()
-#     fieldnames = fieldnames(T)
-#     for field in fieldnames
-#         value = getfield(s, field)
-#         if isstruct(value)
-#             serialized_value = serialize_struct(value, U)
-#             write(buffer, serialized_value)
-#         elseif value isa AbstractArray
-#             serialized_value = serialize(value, U)
-#             write(buffer, serialized_value)
-#         else
-#             serialize(buffer, convert(U, value))
-#         end
-#     end
-#     return take!(buffer)
-# end
-# function isstruct(x)
-#     return x isa DataType && isstructtype(x)
-# end
-
-# function isstructtype(T::DataType)
-#     return T <: AbstractDict || T <: AbstractArray || T <: Tuple || T <: NamedTuple || T <: Struct
-# end
-# #-----------------------------------------------------
-
-# function generate_instruction(accounts::Array{AccountMeta}, program_id::String, data::Vector{UInt8})
-#     return Instruction(program_id, accounts, data)
-# end
-
-# function transfer_sol_generate_message(from_wallet::Wallet, to_pubkey::String, amount::UInt64)
-
-#     # create message
-#     message_header::MessageHeader = MessageHeader(UInt8(1), UInt8(0), UInt8(0))
-
-#     account_keys::Array{String} = []
-#     push!(account_keys, from_wallet.Account.Pubkey)
-#     push!(account_keys, to_pubkey)
-
-#     # TODO WAL-29 - Create Strategy for Recent Blockhash choosing
-#     recent_blockhash::String = get_latest_blockhash()["value"]["blockhash"]
-
-#     instructions::Array{Instruction} = []
-#     # create transfer instruction
-
-#     accounts::Array{AccountMeta} = []
-
-#     push!(accounts, AccountMeta((Vector{UInt8})(from_wallet.Account.Pubkey), (UInt8)(true), (UInt8)(true)))
-#     push!(accounts, AccountMeta((Vector{UInt8})(to_pubkey), (UInt8)(false), (UInt8)(true)))
-#     instruction_id = 2
-
-#     data_buffer = IOBuffer()
-#     write(data_buffer, UInt32(instruction_id))
-#     write(data_buffer, UInt64(amount))
-#     data::Vector{UInt8} = take!(data_buffer)
-
-
-#     instruction::Instruction = Instruction((Vector{UInt8})(solana_programms["system"]), serialize(accounts, UInt32), data)
-#     push!(instructions, instruction)
-
-#     ser_instructions = to_compact_array(instructions, UInt32)
-#     ser_account_keys = to_compact_array(account_keys, UInt32)
-#     ser_messsage_header = serialize_struct(message_header, UInt8)
-#     ser_recent_blockhash = Vector{UInt8}(recent_blockhash)
-#     @assert length(ser_recent_blockhash) == 32 "ser_recent_blockhash must have exactly 32 bytes"
-#     message::Message = Message(ser_messsage_header, ser_account_keys, ser_recent_blockhash, ser_instructions)
-#     return message
-# end
-
+pip_sol = @pyimport("./pip_sol")
 # -------------------------------------------
 function serialize(arr::Array{T}) where {T}
     buffer = IOBuffer()
@@ -352,4 +271,17 @@ function create_message(signatures::Array{String}, wallets::Array{String}, Instr
     message::Message = Message(header, AccountKeys, RecentBlockhash, Instructions)
 
     return message
+end
+
+function pip_send_sol()
+    # 1. Set RPC_URL
+    url = ""
+    # 2. Set secret_key
+    secret_key = ""
+    # 3. Set receiver pubkeys
+    receiver_pubkey = ""
+    # 4. Set amount
+    amount = 0
+
+    pip_sol.send_sol(url, secret_key, receiver_pubkey, amount)
 end
